@@ -1,0 +1,41 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.mycompany.app</groupId>
+  <artifactId>fabricSDKJavaSample</artifactId>
+  <version>0.9</version>
+  <name>fabricSDKJavaSample</name>
+  <url>http://maven.apache.org</url>
+  <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+ </properties>
+
+  <repositories>
+        <repository>
+            <id>sonatype-nexus-snapshots</id>
+            <url>https://nexus.hyperledger.org/content/repositories/releases</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+    
+  <dependencies>
+    <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.12</version>
+        <scope>test</scope>
+    </dependency>
+     <dependency>
+        <groupId>org.hyperledger.fabric-sdk-java</groupId>
+        <artifactId>fabric-sdk-java</artifactId>
+        <version>0.9</version>
+    </dependency>
+  </dependencies>
+</project>
