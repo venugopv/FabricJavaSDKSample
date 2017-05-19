@@ -1,7 +1,9 @@
 # Summary
 ________
 The following example demonstrates the java sdk running a sample program against docker images of a working commit level of the Hyperledger Fabric V1.0 architecture.
-It downloads Fabric Java SDK jar from maven repository which is published by **Hyperledger fabric-sdk-java** project.
+
+It downloads Fabric Java SDK jar from Nexus repository(in future the jar will be pulled from maven repository. The jar will be uploaded to maven repository by **Hyperledger fabric-sdk-java** project)
+
 The sample runs two end to end test cases. These two test cases are primarly taken from [Hyperledger fabric-sdk-java](https://github.com/hyperledger/fabric-sdk-java) tests.
 ### 1)End2endTest
   * Creates two chains (chain 'foo for org1'and chain 'bar' for org2) with each having two peers(peer1 and peer2)
