@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.hyperledger.fabric.sdk.helper.SDKUtil;
+import org.hyperledger.fabric.sdk.helper.Utils;
 import org.hyperledger.fabric.sdkintegration.SampleOrg;
 
 /**
@@ -55,6 +55,8 @@ public class TestConfig {
     private static final String GOSSIPWAITTIME = PROPBASE + "GossipWaitTime";
     private static final String INVOKEWAITTIME = PROPBASE + "InvokeWaitTime";
     private static final String DEPLOYWAITTIME = PROPBASE + "DeployWaitTime";
+    private static final String PROPOSALWAITTIME = PROPBASE + "ProposalWaitTime";
+
 
     private static final String INTEGRATIONTESTS_ORG = PROPBASE + "integrationTests.org.";
     private static final Pattern orgPat = Pattern.compile("^" + Pattern.quote(INTEGRATIONTESTS_ORG) + "([^\\.]+)\\.mspid$");
@@ -90,6 +92,8 @@ public class TestConfig {
             defaultProperty(GOSSIPWAITTIME, "5000");
             defaultProperty(INVOKEWAITTIME, "100000");
             defaultProperty(DEPLOYWAITTIME, "120000");
+            defaultProperty(PROPOSALWAITTIME, "120000");
+
 
             //////
             defaultProperty(INTEGRATIONTESTS_ORG + "peerOrg1.mspid", "Org1MSP");
@@ -178,7 +182,7 @@ public class TestConfig {
 
     private String grpcTLSify(String location) {
         location = location.trim();
-        Exception e = SDKUtil.checkGrpcUrl(location);
+        Exception e = Utils.checkGrpcUrl(location);
         if (e != null) {
             throw new RuntimeException(String.format("Bad TEST parameters for grpc url %s", location), e);
         }
@@ -266,6 +270,15 @@ public class TestConfig {
 
     public int getGossipWaitTime() {
         return Integer.parseInt(getProperty(GOSSIPWAITTIME));
+    }
+
+    /**
+     * Time to wait for proposal to complete
+     *
+     * @return
+     */
+    public long getProposalWaitTime() {
+        return Integer.parseInt(getProperty(PROPOSALWAITTIME));
     }
 
     public Collection<SampleOrg> getIntegrationTestsSampleOrgs() {
@@ -368,5 +381,6 @@ public class TestConfig {
         }
 
     }
+
 
 }
