@@ -12,14 +12,15 @@
  *  limitations under the License.
  */
 
-package org.hyperledger.fabric.endtoend;
+package org.hyperledger.fabric.sdk.endtoend;
 
 import java.io.File;
 import java.net.MalformedURLException;
 import java.util.Collection;
-import java.util.Hashtable;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -52,13 +53,13 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import static java.lang.String.format;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
-
 import org.hyperledger.fabric.sdkintegration.SampleOrg;
 import org.hyperledger.fabric.sdkintegration.SampleStore;
 import org.hyperledger.fabric.sdkintegration.SampleUser;
+
+import static java.lang.String.format;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * Test end to end scenario
@@ -69,8 +70,6 @@ public class UpgradeCCEnd2endTest {
     private static final String TEST_ADMIN_NAME = "admin";
     private static final String TESTUSER_1_NAME = "user1";
     private static final String TEST_FIXTURES_PATH = "src/test/fixture";
-
-    private final int gossipWaitTime = testConfig.getGossipWaitTime();
 
     private static final String CHAIN_CODE_NAME = "example_cc_go";
     private static final String CHAIN_CODE_PATH = "github.com/example_cc";
@@ -86,8 +85,6 @@ public class UpgradeCCEnd2endTest {
 
     private static final String FOO_CHANNEL_NAME = "foo";
     private static final String BAR_CHANNEL_NAME = "bar";
-
-    private Hashtable<String, HFCAClient> fabricCAs = new Hashtable<>();
 
     String testTxID = null;  // save the CC invoke TxID and use in queries
 
@@ -184,12 +181,15 @@ public class UpgradeCCEnd2endTest {
         }
     }
 
+    // Disable MethodLength as this method is for instructional purposes and hence
+    // we don't want to split it into smaller pieces
+    // CHECKSTYLE:OFF: MethodLength
     void runChannel(HFClient client, Channel channel, SampleOrg sampleOrg, final int delta) {
         final String channelName = channel.getName();
         try {
 
 //            final boolean changeContext = false; // BAR_CHANNEL_NAME.equals(channel.getName()) ? true : false;
-            final boolean changeContext = BAR_CHANNEL_NAME.equals(channel.getName()) ? true : false;
+            final boolean changeContext = BAR_CHANNEL_NAME.equals(channel.getName());
 
             out("Running Channel %s with a delta %d", channelName, delta);
             channel.setTransactionWaitTime(testConfig.getTransactionWaitTime());
@@ -279,7 +279,7 @@ public class UpgradeCCEnd2endTest {
                     upgradeProposalRequest.setChaincodeID(chaincodeID_11);
                     upgradeProposalRequest.setProposalWaitTime(testConfig.getProposalWaitTime());
                     upgradeProposalRequest.setFcn("init");
-                    upgradeProposalRequest.setArgs(new String[] {});// no arguments don't change the ledger see chaincode.
+                    upgradeProposalRequest.setArgs(new String[] {});    // no arguments don't change the ledger see chaincode.
 
                     ChaincodeEndorsementPolicy chaincodeEndorsementPolicy;
 
@@ -287,6 +287,9 @@ public class UpgradeCCEnd2endTest {
                     chaincodeEndorsementPolicy.fromYamlFile(new File(TEST_FIXTURES_PATH + "/sdkintegration/chaincodeendorsementpolicy.yaml"));
 
                     upgradeProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
+                    Map<String, byte[]> tmap = new HashMap<>();
+                    tmap.put("test", "data".getBytes());
+                    upgradeProposalRequest.setTransientMap(tmap);
 
                     if (changeContext) {
                         upgradeProposalRequest.setUserContext(sampleOrg.getPeerAdmin());
@@ -441,7 +444,7 @@ public class UpgradeCCEnd2endTest {
             }
             out("sending transaction proposal to all peers with arguments: move(a,b,%s)", moveAmount);
 
-            Collection<ProposalResponse> invokePropResp = channel.sendTransactionProposal(transactionProposalRequest, channel.getPeers());
+            Collection<ProposalResponse> invokePropResp = channel.sendTransactionProposal(transactionProposalRequest);
             for (ProposalResponse response : invokePropResp) {
                 if (response.getStatus() == Status.SUCCESS) {
                     out("Successful transaction proposal response Txid: %s from peer %s", response.getTransactionID(), response.getPeer().getName());
@@ -583,16 +586,16 @@ public class UpgradeCCEnd2endTest {
 //        }
     }
 
-    private static boolean checkInstalledChaincode(HFClient client, Peer peer, String cc_name, String cc_path, String cc_version) throws InvalidArgumentException, ProposalException {
+    private static boolean checkInstalledChaincode(HFClient client, Peer peer, String ccName, String ccPath, String ccVersion) throws InvalidArgumentException, ProposalException {
 
-        out("Checking installed chaincode: %s, at version: %s, on peer: %s", cc_name, cc_version, peer.getName());
+        out("Checking installed chaincode: %s, at version: %s, on peer: %s", ccName, ccVersion, peer.getName());
         List<ChaincodeInfo> ccinfoList = client.queryInstalledChaincodes(peer);
 
         boolean found = false;
 
         for (ChaincodeInfo ccifo : ccinfoList) {
 
-            found = cc_name.equals(ccifo.getName()) && cc_path.equals(ccifo.getPath()) && cc_version.equals(ccifo.getVersion());
+            found = ccName.equals(ccifo.getName()) && ccPath.equals(ccifo.getPath()) && ccVersion.equals(ccifo.getVersion());
             if (found) {
                 break;
             }
@@ -602,14 +605,14 @@ public class UpgradeCCEnd2endTest {
         return found;
     }
 
-    private static boolean checkInstantiatedChaincode(Channel channel, Peer peer, String cc_name, String cc_path, String cc_version) throws InvalidArgumentException, ProposalException {
-        out("Checking instantiated chaincode: %s, at version: %s, on peer: %s", cc_name, cc_version, peer.getName());
+    private static boolean checkInstantiatedChaincode(Channel channel, Peer peer, String ccName, String ccPath, String ccVersion) throws InvalidArgumentException, ProposalException {
+        out("Checking instantiated chaincode: %s, at version: %s, on peer: %s", ccName, ccVersion, peer.getName());
         List<ChaincodeInfo> ccinfoList = channel.queryInstantiatedChaincodes(peer);
 
         boolean found = false;
 
         for (ChaincodeInfo ccifo : ccinfoList) {
-            found = cc_name.equals(ccifo.getName()) && cc_path.equals(ccifo.getPath()) && cc_version.equals(ccifo.getVersion());
+            found = ccName.equals(ccifo.getName()) && ccPath.equals(ccifo.getPath()) && ccVersion.equals(ccifo.getVersion());
             if (found) {
                 break;
             }

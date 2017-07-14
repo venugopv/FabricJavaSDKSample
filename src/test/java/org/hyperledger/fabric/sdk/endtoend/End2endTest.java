@@ -12,11 +12,10 @@
  *  limitations under the License.
  */
 
-package org.hyperledger.fabric.endtoend;
+package org.hyperledger.fabric.sdk.endtoend;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -27,7 +26,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.commons.codec.binary.Hex;
 import org.hyperledger.fabric.protos.ledger.rwset.kvrwset.KvRwset;
 import org.hyperledger.fabric.sdk.BlockEvent;
@@ -84,8 +82,6 @@ public class End2endTest {
     private static final String TEST_ADMIN_NAME = "admin";
     private static final String TESTUSER_1_NAME = "user1";
     private static final String TEST_FIXTURES_PATH = "src/test/fixture";
-
-    private final int gossipWaitTime = testConfig.getGossipWaitTime();
 
     private static final String CHAIN_CODE_NAME = "example_cc_go";
     private static final String CHAIN_CODE_PATH = "github.com/example_cc";
@@ -164,7 +160,7 @@ public class End2endTest {
                 SampleUser admin = sampleStore.getMember(TEST_ADMIN_NAME, orgName);
                 if (!admin.isEnrolled()) {  //Preregistered admin only needs to be enrolled with Fabric caClient.
                     admin.setEnrollment(ca.enroll(admin.getName(), "adminpw"));
-                    admin.setMPSID(mspid);
+                    admin.setMspId(mspid);
                 }
 
                 sampleOrg.setAdmin(admin); // The admin of this org --
@@ -176,7 +172,7 @@ public class End2endTest {
                 }
                 if (!user.isEnrolled()) {
                     user.setEnrollment(ca.enroll(user.getName(), user.getEnrollmentSecret()));
-                    user.setMPSID(mspid);
+                    user.setMspId(mspid);
                 }
                 sampleOrg.addUser(user); //Remember user belongs to this Org
 
@@ -186,7 +182,7 @@ public class End2endTest {
                 // src/test/fixture/sdkintegration/e2e-2Orgs/channel/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/
 
                 SampleUser peerOrgAdmin = sampleStore.getMember(sampleOrgName + "Admin", sampleOrgName, sampleOrg.getMSPID(),
-                        findFile_sk(Paths.get(testConfig.getTestChannlePath(), "crypto-config/peerOrganizations/",
+                        findFileSk(Paths.get(testConfig.getTestChannlePath(), "crypto-config/peerOrganizations/",
                                 sampleOrgDomainName, format("/users/Admin@%s/msp/keystore", sampleOrgDomainName)).toFile()),
                         Paths.get(testConfig.getTestChannlePath(), "crypto-config/peerOrganizations/", sampleOrgDomainName,
                                 format("/users/Admin@%s/msp/signcerts/Admin@%s-cert.pem", sampleOrgDomainName, sampleOrgDomainName)).toFile());
@@ -208,7 +204,6 @@ public class End2endTest {
             runChannel(client, barChannel, true, sampleOrg, 100); //run a newly constructed bar channel with different b value!
             //let bar channel just shutdown so we have both scenarios.
 
-
             out("\nTraverse the blocks for chain %s ", barChannel.getName());
             blockWalker(barChannel);
             out("That's all folks!");
@@ -221,11 +216,13 @@ public class End2endTest {
 
     }
 
+    //CHECKSTYLE.OFF: Method length is 320 lines (max allowed is 150).
     void runChannel(HFClient client, Channel channel, boolean installChaincode, SampleOrg sampleOrg, int delta) {
 
         try {
 
             final String channelName = channel.getName();
+            boolean isFooChain = FOO_CHANNEL_NAME.equals(channelName);
             out("Running channel %s", channelName);
             channel.setTransactionWaitTime(testConfig.getTransactionWaitTime());
             channel.setDeployWaitTime(testConfig.getDeployWaitTime());
@@ -253,7 +250,7 @@ public class End2endTest {
                 InstallProposalRequest installProposalRequest = client.newInstallProposalRequest();
                 installProposalRequest.setChaincodeID(chaincodeID);
 
-                if (FOO_CHANNEL_NAME.equals(channel.getName())) {
+                if (isFooChain) {
                     // on foo chain install from directory.
 
                     ////For GO language and serving just a single user, chaincodeSource is mostly likely the users GOPATH
@@ -329,7 +326,12 @@ public class End2endTest {
             successful.clear();
             failed.clear();
 
-            responses = channel.sendInstantiationProposal(instantiateProposalRequest, channel.getPeers());
+            if (isFooChain) {  //Send responses both ways with specifying peers and by using those on the channel.
+                responses = channel.sendInstantiationProposal(instantiateProposalRequest, channel.getPeers());
+            } else {
+                responses = channel.sendInstantiationProposal(instantiateProposalRequest);
+
+            }
             for (ProposalResponse response : responses) {
                 if (response.isVerified() && response.getStatus() == ProposalResponse.Status.SUCCESS) {
                     successful.add(response);
@@ -499,10 +501,10 @@ public class End2endTest {
             // We can only send channel queries to peers that are in the same org as the SDK user context
             // Get the peers from the current org being used and pick one randomly to send the queries to.
             Set<Peer> peerSet = sampleOrg.getPeers();
-            Peer queryPeer = peerSet.iterator().next();
-            out("Using peer %s for channel queries", queryPeer.getName());
+            //  Peer queryPeer = peerSet.iterator().next();
+            //   out("Using peer %s for channel queries", queryPeer.getName());
 
-            BlockchainInfo channelInfo = channel.queryBlockchainInfo(queryPeer);
+            BlockchainInfo channelInfo = channel.queryBlockchainInfo();
             out("Channel info for : " + channelName);
             out("Channel height: " + channelInfo.getHeight());
             String chainCurrentHash = Hex.encodeHexString(channelInfo.getCurrentBlockHash());
@@ -511,7 +513,7 @@ public class End2endTest {
             out("Chainl previous block hash: " + chainPreviousHash);
 
             // Query by block number. Should return latest block, i.e. block number 2
-            BlockInfo returnedBlock = channel.queryBlockByNumber(queryPeer, channelInfo.getHeight() - 1);
+            BlockInfo returnedBlock = channel.queryBlockByNumber(channelInfo.getHeight() - 1);
             String previousHash = Hex.encodeHexString(returnedBlock.getPreviousHash());
             out("queryBlockByNumber returned correct block with blockNumber " + returnedBlock.getBlockNumber()
                     + " \n previous_hash " + previousHash);
@@ -520,17 +522,17 @@ public class End2endTest {
 
             // Query by block hash. Using latest block's previous hash so should return block number 1
             byte[] hashQuery = returnedBlock.getPreviousHash();
-            returnedBlock = channel.queryBlockByHash(queryPeer, hashQuery);
+            returnedBlock = channel.queryBlockByHash(hashQuery);
             out("queryBlockByHash returned block with blockNumber " + returnedBlock.getBlockNumber());
             assertEquals(channelInfo.getHeight() - 2, returnedBlock.getBlockNumber());
 
             // Query block by TxID. Since it's the last TxID, should be block 2
-            returnedBlock = channel.queryBlockByTransactionID(queryPeer, testTxID);
+            returnedBlock = channel.queryBlockByTransactionID(testTxID);
             out("queryBlockByTxID returned block with blockNumber " + returnedBlock.getBlockNumber());
             assertEquals(channelInfo.getHeight() - 1, returnedBlock.getBlockNumber());
 
             // query transaction by ID
-            TransactionInfo txInfo = channel.queryTransactionByID(queryPeer, testTxID);
+            TransactionInfo txInfo = channel.queryTransactionByID(testTxID);
             out("QueryTransactionByID returned TransactionInfo: txID " + txInfo.getTransactionID()
                     + "\n     validation code " + txInfo.getValidationCode().getNumber());
 
@@ -542,6 +544,7 @@ public class End2endTest {
             fail("Test failed with error : " + e.getMessage());
         }
     }
+    //CHECKSTYLE.ON: Method length is 320 lines (max allowed is 150).
 
     private Channel constructChannel(String name, HFClient client, SampleOrg sampleOrg) throws Exception {
         ////////////////////////////
@@ -549,6 +552,9 @@ public class End2endTest {
         //
 
         out("Constructing channel %s", name);
+
+        //Only peer Admin org
+        client.setUserContext(sampleOrg.getPeerAdmin());
 
         Collection<Orderer> orderers = new LinkedList<>();
 
@@ -572,9 +578,6 @@ public class End2endTest {
 
         ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(TEST_FIXTURES_PATH + "/sdkintegration/e2e-2Orgs/channel/" + name + ".tx"));
 
-        //Only peer Admin org
-        client.setUserContext(sampleOrg.getPeerAdmin());
-
         //Create channel that has only one signer that is this orgs peer admin. If channel creation policy needed more signature they would need to be added too.
         Channel newChannel = client.newChannel(name, anOrderer, channelConfiguration, client.getChannelConfigurationSignature(channelConfiguration, sampleOrg.getPeerAdmin()));
 
@@ -583,7 +586,7 @@ public class End2endTest {
         for (String peerName : sampleOrg.getPeerNames()) {
             String peerLocation = sampleOrg.getPeerLocation(peerName);
 
-            Properties peerProperties = testConfig.getPeerProperties(peerName);//test properties for peer.. if any.
+            Properties peerProperties = testConfig.getPeerProperties(peerName); //test properties for peer.. if any.
             if (peerProperties == null) {
                 peerProperties = new Properties();
             }
@@ -642,7 +645,7 @@ public class End2endTest {
 //        }
     }
 
-    File findFile_sk(File directory) {
+    File findFileSk(File directory) {
 
         File[] matches = directory.listFiles((dir, name) -> name.endsWith("_sk"));
 
@@ -658,16 +661,15 @@ public class End2endTest {
 
     }
 
-    private static final Map<String, String> txExpected;
+    private static final Map<String, String> TX_EXPECTED;
 
     static {
-        txExpected = new HashMap<String, String>();
-        txExpected.put("readset1", "Missing readset for channel bar block 1");
-        txExpected.put("writeset1", "Missing writeset for channel bar block 1");
+        TX_EXPECTED = new HashMap<>();
+        TX_EXPECTED.put("readset1", "Missing readset for channel bar block 1");
+        TX_EXPECTED.put("writeset1", "Missing writeset for channel bar block 1");
     }
 
-    void blockWalker(Channel channel) throws InvalidProtocolBufferException, InvalidArgumentException, ProposalException, UnsupportedEncodingException, IOException {
-
+    void blockWalker(Channel channel) throws InvalidArgumentException, ProposalException, IOException {
         try {
             BlockchainInfo channelInfo = channel.queryBlockchainInfo();
 
@@ -712,9 +714,9 @@ public class End2endTest {
                             assertEquals(200, transactionActionInfo.getResponseStatus());
                             out("   Transaction action %d has response message bytes as string: %s", j,
                                     printableString(new String(transactionActionInfo.getResponseMessageBytes(), "UTF-8")));
-
                             out("   Transaction action %d has %d endorsements", j, transactionActionInfo.getEndorsementsCount());
                             assertEquals(2, transactionActionInfo.getEndorsementsCount());
+
                             for (int n = 0; n < transactionActionInfo.getEndorsementsCount(); ++n) {
                                 BlockInfo.EndorserInfo endorserInfo = transactionActionInfo.getEndorsementInfo(n);
                                 out("Endorser %d signature: %s", n, Hex.encodeHexString(endorserInfo.getSignature()));
@@ -722,24 +724,20 @@ public class End2endTest {
                             }
                             out("   Transaction action %d has %d chaincode input arguments", j, transactionActionInfo.getChaincodeInputArgsCount());
                             for (int z = 0; z < transactionActionInfo.getChaincodeInputArgsCount(); ++z) {
-
                                 out("     Transaction action %d has chaincode input argument %d is: %s", j, z,
                                         printableString(new String(transactionActionInfo.getChaincodeInputArgs(z), "UTF-8")));
                             }
 
                             out("   Transaction action %d proposal response status: %d", j,
                                     transactionActionInfo.getProposalResponseStatus());
-
                             out("   Transaction action %d proposal response payload: %s", j,
                                     printableString(new String(transactionActionInfo.getProposalResponsePayload())));
 
                             TxReadWriteSetInfo rwsetInfo = transactionActionInfo.getTxReadWriteSet();
                             if (null != rwsetInfo) {
-
                                 out("   Transaction action %d has %d name space read write sets", j, rwsetInfo.getNsRwsetCount());
 
                                 for (TxReadWriteSetInfo.NsRwsetInfo nsRwsetInfo : rwsetInfo.getNsRwsetInfos()) {
-
                                     final String namespace = nsRwsetInfo.getNaamespace();
                                     KvRwset.KVRWSet rws = nsRwsetInfo.getRwset();
 
@@ -751,7 +749,6 @@ public class End2endTest {
                                                 readList.getVersion().getBlockNum(), readList.getVersion().getTxNum());
 
                                         if ("bar".equals(channelId) && blockNumber == 2) {
-
                                             if ("example_cc_go".equals(namespace)) {
                                                 if (rs == 0) {
                                                     assertEquals("a", readList.getKey());
@@ -765,17 +762,14 @@ public class End2endTest {
                                                     fail(format("unexpected readset %d", rs));
                                                 }
 
-                                                txExpected.remove("readset1");
+                                                TX_EXPECTED.remove("readset1");
                                             }
                                         }
-
                                     }
 
                                     rs = -1;
-
                                     for (KvRwset.KVWrite writeList : rws.getWritesList()) {
                                         rs++;
-
                                         String valAsString = printableString(new String(writeList.getValue().toByteArray(), "UTF-8"));
 
                                         out("     Namespace %s write set %d key %s has value '%s' ", namespace, rs,
@@ -785,38 +779,29 @@ public class End2endTest {
                                         if ("bar".equals(channelId) && blockNumber == 2) {
                                             if (rs == 0) {
                                                 assertEquals("a", writeList.getKey());
-
                                                 assertEquals("400", valAsString);
                                             } else if (rs == 1) {
                                                 assertEquals("b", writeList.getKey());
-
                                                 assertEquals("400", valAsString);
                                             } else {
                                                 fail(format("unexpected writeset %d", rs));
                                             }
 
-                                            txExpected.remove("writeset1");
+                                            TX_EXPECTED.remove("writeset1");
                                         }
-
                                     }
                                 }
-
                             }
-
                         }
-
                     }
-
                 }
-
             }
-            if (!txExpected.isEmpty()) {
-                fail(txExpected.get(0));
+            if (!TX_EXPECTED.isEmpty()) {
+                fail(TX_EXPECTED.get(0));
             }
         } catch (InvalidProtocolBufferRuntimeException e) {
             throw e.getCause();
         }
-
     }
 
     static String printableString(final String string) {
